@@ -5,8 +5,8 @@ import 'package:dartz/dartz.dart';
 abstract class Combinators {
   static Ref<I, A> retn<I, A>(A x) {
     return Ref((input) => ConsumedT.empty(
-        Reply.ok(x, input, Message.lazy(() => Message.of1(input.position()))),
-    ));
+          Reply.ok(x, input, Message.lazy(() => Message.of1(input.position()))),
+        ));
   }
 
   /**
@@ -25,19 +25,14 @@ abstract class Combinators {
   static Ref<I, B> bind<I, A, B>(Ref<I, A> p, Function1<A, Ref<I, B>> f) {
     return Ref((input) {
       final ConsumedT<I, A> cons1 = p.apply(input);
-      print("cons1 ${cons1}");
       if (cons1.isConsumed()) {
-        print('enter is consumed ${(cons1 as Consumed).supplier}');
-        return ConsumedT.consumed(() {
-          cons1.getReply().match(
-            (ok1) {
-              final ConsumedT<I, B> cons2 = (f(ok1.result)).apply(ok1.rest);
-              print('cons2 ${cons2}');
-              return cons2.getReply();
-            },
-            (error) => error.cast<B>(),
-          );
-        });
+        return ConsumedT.consumed(() => cons1.getReply().match(
+              (ok1) {
+                final ConsumedT<I, B> cons2 = (f(ok1.result)).apply(ok1.rest);
+                return cons2.getReply();
+              },
+              (error) => error.cast<B>(),
+            ));
       } else {
         return cons1.getReply().match((ok1) {
           final ConsumedT<I, B> cons2 = (f(ok1.result)).apply(ok1.rest);
@@ -87,10 +82,10 @@ abstract class Combinators {
             return cons2
                 .getReply()
                 .match(
-                    (ok2) => ConsumedT.mergeOk(
-                        ok2.result, ok2.rest, error1.message, ok2.message),
-                    (error2) =>
-                        ConsumedT.mergeError(error1.message, error2.message),
+                  (ok2) => ConsumedT.mergeOk(
+                      ok2.result, ok2.rest, error1.message, ok2.message),
+                  (error2) =>
+                      ConsumedT.mergeError(error1.message, error2.message),
                 )
                 .cast();
           }
@@ -102,7 +97,6 @@ abstract class Combinators {
   static Ref<I, A> choice2<I, A>(Ref<I, A> p1, Ref<I, A> p2) {
     return or(p1, p2);
   }
-
 
   static Ref<I, A> choice4<I, A>(
       Ref<I, A> p1, Ref<I, A> p2, Ref<I, A> p3, Ref<I, A> p4) {
@@ -124,13 +118,14 @@ abstract class Combinators {
         return cons;
       } else {
         return cons.getReply().match(
-            (ok) => ConsumedT.empty(Reply.ok(ok.result, ok.rest, ok.message.expect(name))),
-            (error) => ConsumedT.empty(Reply.error(error.message.expect(name))),
-        );
+              (ok) => ConsumedT.empty(
+                  Reply.ok(ok.result, ok.rest, ok.message.expect(name))),
+              (error) =>
+                  ConsumedT.empty(Reply.error(error.message.expect(name))),
+            );
       }
     });
   }
-
 
   static Ref<I, I> satisfy<I>(Predicate<I> test) {
     return Ref((input) {
@@ -138,20 +133,14 @@ abstract class Combinators {
         final I s = input.current();
         if (test(s)) {
           final Input<I> newInput = input.next0();
-          return ConsumedT.consumed(
-                  () =>
-                  Reply.ok(
-                    s,
-                    newInput,
-                    Message.lazy(() => Message.of1(input.position())),
-                  )
-          );
+          return ConsumedT.consumed(() => Reply.ok(
+                s,
+                newInput,
+                Message.lazy(() => Message.of1(input.position())),
+              ));
         } else {
-          return ConsumedT.empty(
-            Reply.error(
-              Message.lazy(() => Message.of3(input.position(), input.current(), '<test>'))
-            )
-          );
+          return ConsumedT.empty(Reply.error(Message.lazy(
+              () => Message.of3(input.position(), input.current(), '<test>'))));
         }
       } else {
         return ConsumedT.empty(endOfInput(input, '<test>'));
@@ -171,17 +160,18 @@ abstract class Combinators {
     return satisfy1(c);
   }
 
-  static final String INTEGER_REGEX = "-?\\d+";
-  static final String DOUBLE_REGEX = "-?(\\d+(\\.\\d*)?|\\d*\\.\\d+)([eE][+-]?\\d+)?[fFdD]?";
+  static final String INTEGER_REGEX = "([0-9]+)";
+  static final String DOUBLE_REGEX = "(([0-9]+)(\\.[0-9]+)?([eE][-+]?[0-9]+)?)";
 
   static final Ref<String, int> lng = bind(
-      regex(INTEGER_REGEX), (s) => safeRetn((str) => int.parse(str), s, "int"),
+    regex(INTEGER_REGEX),
+    (s) => safeRetn((str) => int.parse(str), s, "int"),
   ).label("int");
 
   static final Ref<String, double> dble = bind(
-      regex(DOUBLE_REGEX), (s) => safeRetn((s) => double.parse(s), s, "double"),
+    regex(DOUBLE_REGEX),
+    (s) => safeRetn((s) => double.parse(s), s, "double"),
   ).label("double");
-
 
   /**
    * Apply the first parser, then apply the second parser and return the result.
@@ -194,44 +184,40 @@ abstract class Combinators {
    * @param <B>       the second parser value type
    * @return          the parser
    */
-  static Ref<I, B> then<I, A, B>(Ref<I, A> p , Ref<I, B> q) {
-    return Ref(
-        (input) {
-          final ConsumedT<I, A> cons1 = p.apply(input);
-          if (cons1.isConsumed()) {
-            return ConsumedT.consumed(() {
-              cons1.getReply().match(
-                  (ok1) {
-                    final ConsumedT<I, B> cons2 = q.apply(ok1.rest);
-                    return cons2.getReply();
-                  },
-                  (error) => error.cast(),
-              );
-            });
-          } else {
-            return cons1.getReply().match(
-                (ok1) {
-                  final ConsumedT<I, B> cons2 = q.apply(ok1.rest);
-                  if (cons2.isConsumed()) {
-                    return cons2;
-                  } else {
-                    return cons2.getReply().match(
-                        (ok2) => ConsumedT.mergeOk(ok2.result, ok2.rest, ok1.message, ok2.message),
-                        (error2) => ConsumedT.mergeError(ok1.message, error2.message)
-                    );
-                  }
-                },
-                (error) => cons1.cast(),
-            );
-          }
-        }
-    );
+  static Ref<I, B> then<I, A, B>(Ref<I, A> p, Ref<I, B> q) {
+    return Ref((input) {
+      final ConsumedT<I, A> cons1 = p.apply(input);
+      if (cons1.isConsumed()) {
+        return ConsumedT.consumed(() => cons1.getReply().match<Reply<I, B>>(
+              (ok1) {
+                final ConsumedT<I, B> cons2 = q.apply(ok1.rest);
+                return cons2.getReply();
+              },
+              (error) => error.cast(),
+            ));
+      } else {
+        return cons1.getReply().match<ConsumedT<I, B>>(
+          (ok1) {
+            final ConsumedT<I, B> cons2 = q.apply(ok1.rest);
+            if (cons2.isConsumed()) {
+              return cons2;
+            } else {
+              return cons2.getReply().match(
+                  (ok2) => ConsumedT.mergeOk(
+                      ok2.result, ok2.rest, ok1.message, ok2.message),
+                  (error2) =>
+                      ConsumedT.mergeError(ok1.message, error2.message));
+            }
+          },
+          (error) => cons1.cast(),
+        );
+      }
+    });
   }
 
   static Reply<I, A> endOfInput<I, A>(Input<I> input, String expected) {
     return Reply.error(
-      Message.lazy(() => Message.endOfInput(input.position(), expected))
-    );
+        Message.lazy(() => Message.endOfInput(input.position(), expected)));
   }
 
   /**
@@ -241,48 +227,42 @@ abstract class Combinators {
    */
   static Ref<String, String> regex(String regex) {
     final RegExp pattern = RegExp(regex, multiLine: true);
-    return Ref(
-        (state) {
-          String cs;
-          if (state is StringInput) {
-            final StringInput input = state;
-            cs = input.getCharSequence();
-          } else {
-            throw new Exception('regex only supported on CharState inputs');
-          }
+    return Ref((state) {
+      String cs;
+      if (state is StringInput) {
+        final StringInput input = state;
+        cs = input.getCharSequence();
+      } else {
+        throw new Exception('regex only supported on CharState inputs');
+      }
 
-          final Match match = pattern.firstMatch(cs);
-          final Message<String> msg = Message.lazy(
-              () => Message.of3(state.position(), state.current(), "Regex(\"${regex}\")")
-          );
+      final Match match = pattern.firstMatch(cs);
+      final Message<String> msg = Message.lazy(() => Message.of3(
+          state.position(), state.current(), "Regex(\"${regex}\")"));
 
-          if (match != null) {
-            final int end = match.end;
-            final String str = cs.substring(0, end);
-            return ConsumedT.consumed(() => Reply.ok(str, state.next(end), msg));
-          } else {
-            return ConsumedT.empty(Reply.error(msg));
-          }
-        }
-    );
+      if (match != null && match.start == 0) {
+        final int end = match.end;
+        final String str = cs.substring(0, end);
+        return ConsumedT.consumed(() => Reply.ok(str, state.next(end), msg));
+      } else {
+        return ConsumedT.empty(Reply.error(msg));
+      }
+    });
   }
 
   // Variant of retn which translates exceptions into ConsumedT errors.
-  static Ref<String, A> safeRetn<A>(Function1<String, A> f, String s, String expected) {
-    return Ref(
-        (input) {
-          try {
-            final A val = f(s);
-            return ConsumedT.empty(
-              Reply.ok(val, input, Message.lazy(() => Message.of1(input.position())))
-            );
-          } catch(e) {
-            return ConsumedT.empty(
-              Reply.error(Message.lazy(() => Message.of3(input.position(), input.current(), expected)))
-            );
-          }
-        }
-    );
+  static Ref<String, A> safeRetn<A>(
+      Function1<String, A> f, String s, String expected) {
+    return Ref((input) {
+      try {
+        final A val = f(s);
+        return ConsumedT.empty(Reply.ok(
+            val, input, Message.lazy(() => Message.of1(input.position()))));
+      } catch (e) {
+        return ConsumedT.empty(Reply.error(Message.lazy(
+            () => Message.of3(input.position(), input.current(), expected))));
+      }
+    });
   }
 
   /**
@@ -290,24 +270,19 @@ abstract class Combinators {
    * @param <I>       the input symbol type
    * @return          the parser
    */
-  static Ref<I, Unit> eof<I, Unit>() {
-    return Ref(
-        (input) {
-          if (input.end()) {
-            return ConsumedT.empty(
-              Reply.ok2(
-                  input,
-                  Message.lazy(() => Message.of2(input.position(), 'EOF')),
-              ),
-            );
-          } else {
-            return ConsumedT.empty(
-              Reply.error(
-                Message.lazy(() => Message.of3(input.position(), input.current(), 'EOF'))
-              )
-            );
-          }
-        }
-    );
+  static Ref<I, Unit> eof<I>() {
+    return Ref((input) {
+      if (input.end()) {
+        return ConsumedT.empty(
+          Reply.ok2(
+            input,
+            Message.lazy(() => Message.of2(input.position(), 'EOF')),
+          ),
+        );
+      } else {
+        return ConsumedT.empty(Reply.error(Message.lazy(
+            () => Message.of3(input.position(), input.current(), 'EOF'))));
+      }
+    });
   }
 }

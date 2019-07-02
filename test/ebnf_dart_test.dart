@@ -44,18 +44,22 @@ void main() {
 
     final Ref<String, Unit> eof = Combinators.eof();
 
-    final Ref<String, double> parser = Combinators.dble.bind((d) => eof.then(Combinators.retn(d)));
+    final Ref<String, double> parser = expr.bind(
+        (d) => eof.then(
+          Combinators.retn(d)
+        )
+    );
 
     void evaluate(String s) {
-      print("$s == ${Combinators.dble.parse(Input.string(s)).getResult()}");
+      print("$s == ${parser.parse(Input.string(s)).getResult()}");
     }
 
-    // evaluate('1');
-    print('\n');
+     evaluate("(100000+1000)");
+//    print('\n');
 //    print(Combinators.regex(Combinators.DOUBLE_REGEX).parse(Input.string("100.0")).getResult());
 //    print(Combinators.regex(Combinators.INTEGER_REGEX).parse(Input.string("100")).getResult());
-    print('dble ${Combinators.dble}, ${Combinators.dble.parser}');
+//    print('dble ${Combinators.dble}, ${Combinators.dble.parser}');
 
-   // print(Combinators.dble.parse(Input.string("100")).getResult());
+//    print(Combinators.dble.parse(Input.string("100")).getResult());
   });
 }

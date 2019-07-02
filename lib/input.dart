@@ -45,7 +45,7 @@ class StringInput extends Input<String> {
 
   @override
   Input<String> next(int n) {
-    return new StringInput(symbols, pos + 1);
+    return new StringInput(symbols, n + 1);
   }
 
   @override

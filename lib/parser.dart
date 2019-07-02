@@ -46,12 +46,26 @@ abstract class Message<I> {
   Set<String> expected();
 
   Message<I> merge(Message<I> rhs) {
-    return Message.lazy(() =>
-        MessageImpl(
+    return Message.lazy(() => MessageImpl(
           this.position(),
           this.symbol(),
           this.expected().union(rhs.expected()),
         ));
+  }
+
+  @override
+  String toString() {
+    switch (expected().length) {
+      case 0:
+        return "Unexpected \'${symbol()}\' at position ${position() == -1 ? "EOF" : position()} "
+            ". Expecting nothing";
+      default:
+        final String expectedStr =
+            iset<String>(expected()).foldRight('', (x, y) => "${x}, ${y} ");
+
+        return "Unexpected \'${symbol()}\' at position ${position() == -1 ? "EOF" : position()} "
+            ". Expecting one of [${expectedStr}]";
+    }
   }
 }
 
@@ -162,7 +176,7 @@ abstract class Reply<I, A> {
   }
 
   static OK<I, A> ok2<I, A>(Input<I> tail, Message<I> msg) {
-    return new OK((unit as A), tail, msg);
+    return new OK(null, tail, msg);
   }
 
   static Error<I, A> error<I, A>(Message<I> msg) {
@@ -201,7 +215,7 @@ class Error<I, A> extends Reply<I, A> {
 
   Reply<I, B> cast<B>() {
     dynamic p = this;
-    return p;
+    return new Error(message);
   }
 
   @override
@@ -226,8 +240,8 @@ abstract class ConsumedT<I, A> {
     return new Empty<I, A>(reply);
   }
 
-  static ConsumedT<I, A> of<I, A>(bool consumed,
-      Supplier<Reply<I, A>> supplier) {
+  static ConsumedT<I, A> of<I, A>(
+      bool consumed, Supplier<Reply<I, A>> supplier) {
     return consumed
         ? ConsumedT.consumed(supplier)
         : ConsumedT.empty(supplier());
@@ -238,12 +252,12 @@ abstract class ConsumedT<I, A> {
   Reply<I, A> getReply();
 
   ConsumedT<I, B> cast<B>() {
-    dynamic ca = this;
-    return ca;
+    dynamic t = this;
+    return t;
   }
 
-  static ConsumedT<I, A> mergeOk<I, A>(A x, Input<I> input, Message<I> msg1,
-      Message<I> msg2) {
+  static ConsumedT<I, A> mergeOk<I, A>(
+      A x, Input<I> input, Message<I> msg1, Message<I> msg2) {
     return ConsumedT.empty(Reply.ok(x, input, msg1.merge(msg2)));
   }
 
@@ -322,7 +336,8 @@ class Ref<I, A> {
 
   ConsumedT<I, A> apply(Input<I> input) {
     print('parser ${parse} input ${input}');
-    return parser(input);
+    var result = parser(input);
+    return result;
   }
 
   Ref<I, B> then<B>(Ref<I, B> p) {
@@ -341,24 +356,20 @@ class Ref<I, A> {
    * Parse the input state, extract the result and apply one of the supplied functions.
    * @return a parse result
    */
-  Reply<I, A>  parse(Input<I> input) {
+  Reply<I, A> parse(Input<I> input) {
     var apply1 = apply(input);
 
     print('apply1 ${(apply1 as Consumed).supplier}');
 
-    return
-        apply1
-          .getReply()
-          .match(
-              // Strip off the message if the parse was successful.
-              (ok) => Reply.ok(ok.result, ok.rest, Message.of0()),
-              (error) => error,
-      );
+    return apply1.getReply().match(
+          // Strip off the message if the parse was successful.
+          (ok) => Reply.ok(ok.result, ok.rest, Message.of0()),
+          (error) => error,
+        );
   }
 }
 
 class Parsers {
-
   static Ref<I, A> refEmpty<I, A>() {
     return Ref(null);
   }
@@ -370,6 +381,5 @@ class Parsers {
 //  Ref<I, B> then<I, B>(Parser<I, B> p) {
 //    return Combinators.then(this, p);
 //  }
-
 
 }
